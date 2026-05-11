@@ -50,6 +50,7 @@ tcp   LISTEN 0      128              [::]:20022         [::]:*
 </br></br>
 
 <span style="color:red"><b>🔴 트러블 슈팅</b></span>
+
 ### SSH Socket 설정 충돌
 #### 문제 상황
 sshd_config를 수정해도 포트가 바뀌지 않는 문제 발생
@@ -70,7 +71,28 @@ sudo systemctl restart ssh
 
 </br></br>
 
-- 방화벽(UFW 또는 firewalld) 활성화 및 20022/tcp, 15034/tcp만 허용 내역
+###  방화벽(UFW 또는 firewalld) 활성화 및 20022/tcp, 15034/tcp만 허용 내역
+
+| 항목 | UFW (Uncomplicated Firewall) | firewalld |
+| :--- | :--- | :--- |
+| **개발 목적** | 사용자 편의성 및 단순함 극대화 | 동적 관리 및 엔터프라이즈 환경 대응 |
+| **기본 OS** | Ubuntu, Debian 계열 | RHEL, CentOS, Fedora, AlmaLinux |
+| **관리 방식** | **정적(Static)**: 규칙 변경 시 재시작 필요 | **동적(Dynamic)**: 서비스 중단 없이 적용 가능 |
+| **핵심 개념** | 포트 및 서비스 위주 | **Zone(구역)** 및 서비스 위주 |
+| **설정 저장** | 즉시 반영 (또는 reload 필요) | Runtime(즉시) vs Permanent(영구) 구분 |
+| **난이도** | 매우 낮음 (초보자 권장) | 중간 (학습 곡선 존재) |
+</br></br>
+
+| 구분 | TCP (Transmission Control Protocol) | UDP (User Datagram Protocol) |
+| :--- | :--- | :--- |
+| **연결 방식** | 연결 지향형 (3-way handshake) | 비연결형 (No handshake) |
+| **신뢰성** | **높음** (데이터 유실 시 재전송) | **낮음** (유실되어도 재전송 없음) |
+| **전송 순서** | 보장됨 (Sequence Number 사용) | 보장되지 않음 |
+| **속도** | 상대적으로 느림 (제어 로직 포함) | 매우 빠름 (단순 전송) |
+| **제어 기능** | 흐름 제어, 혼잡 제어 수행 | 거의 없음 (체크섬 정도만 수행) |
+| **전송 단위** | 세그먼트 (Stream 기반) | 데이터그램 (Message 기반) |
+</br></br>
+
 ```
 $ sudo ufw allow 20022/tcp
 $ sudo ufw allow 15034/tcp
@@ -87,7 +109,50 @@ To                         Action      From
 15034/tcp (v6)             ALLOW       Anywhere (v6)
 ```
 
-- 계정/그룹(agent-admin/dev/test, agent-common/core) 생성 확인 내역
+### 계정/그룹(agent-admin/dev/test, agent-common/core) 생성 확인 내역
+
+```
+# 그룹 생성
+$ sudo groupadd agent-common
+$ sudo groupadd agent-core
+
+# 그룹 생성 확인
+$ sudo getent group
+agent-common:x:1001:
+agent-core:x:1002:
+
+# 계정 생성 및 그룹 지정 
+$ sudo useradd -m -G agent-common,agent-core agent-admin
+$ sudo useradd -m -G agent-common,agent-core agent-dev
+$ sudo useradd -m -G agent-common agent-test
+
+# 계정 생성 확인
+$ getent group agent-common
+agent-common:x:1001:agent-admin,agent-dev,agent-test
+$ getent group agent-core
+agent-core:x:1002:agent-admin,agent-dev
+```
+
+### 출력 결과 해석 예시
+  agent-admin:x:1001:user1,user2
+   1. agent-admin: 그룹 이름
+   2. x: 그룹 비밀번호 (보통 사용 안 함)
+   3. 1001: 그룹 GID
+
+### 유저 생성 시 유저 이름과 같은 그룹이 생성되는 이유
+```
+$ sudo useradd -m -G agent-common,agent-core agent-admin
+$ getent group
+agent-admin:x:1003:
+```
+
+사용자를 생성할 때 해당 사용자 전용의 그룹을 자동으로 만들고, 이를 사용자의 기본 그룹(Primary Group)으로 설정
+
+#### 이유
+만약 모든 사용자의 기본 그룹이 users나 common 같은 공통 그룹이라면 한 사용자가 파일을 만들 때 그룹 권한(rw-r-----)이 다른 사용자에게 노출될 위험이 큽니다. 
+
+전용 그룹을 사용하면 본인 외에는 그룹 권한으로도 파일에 접근할 수 없어 안전합니다.
+
 - 디렉토리 구조 및 권한(ACL 포함) 확인 내역
 - 앱 Boot Sequence 5단계 [OK] 및 “Agent READY” 확인 내역
 - monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
