@@ -153,7 +153,75 @@ agent-admin:x:1003:
 
 전용 그룹을 사용하면 본인 외에는 그룹 권한으로도 파일에 접근할 수 없어 안전합니다.
 
-- 디렉토리 구조 및 권한(ACL 포함) 확인 내역
+### 디렉토리 구조 및 권한(ACL 포함) 확인 내역
+#### 접근 제어 목록(Access Control List)
+Access Control List (ACL)는 파일과 디렉토리에 대해 세분화된 사용자 및 그룹 권한을 설정할 수 있게 해주는 기능입니다. 기본적인 리눅스 권한 시스템은 소유자, 그룹, 기타에 대한 권한을 제공하는 반면, ACL을 통해서는 특정 사용자 또는 그룹에 대해 더 구체적인 권한을 부여할 수 있습니다.
+```
+# 1. 환경 변수 설정 (권장: /home/agent-admin/agent-app)
+$ export AGENT_HOME=/home/agent-admin/agent-app
+
+# 2. 디렉토리 생성 (sudo 권한 필요)
+$ sudo mkdir -p $AGENT_HOME/upload_files
+$ sudo mkdir -p $AGENT_HOME/api_keys
+$ sudo mkdir -p /var/log/agent-app
+
+# 3. 기본 소유권 설정 (관리자 계정 할당)
+$ sudo chown agent-admin:agent-admin $AGENT_HOME
+
+# 소유 그룹 변경 및 기본 권한(UGO) 설정
+$ sudo chgrp agent-common $AGENT_HOME/upload_files
+$ sudo chmod 770 $AGENT_HOME/upload_files
+
+# ACL 적용: 그룹 권한 명시 및 향후 생성 파일 권한 상속(Default ACL)
+$ sudo setfacl -m g:agent-common:rwx $AGENT_HOME/upload_files
+$ sudo setfacl -d -m g:agent-common:rwx $AGENT_HOME/upload_files
+
+# 소유 그룹 변경 및 기본 권한 설정 (Others 접근 완전 차단)
+$ sudo chgrp agent-core $AGENT_HOME/api_keys /var/log/agent-app
+$ sudo chmod 770 $AGENT_HOME/api_keys /var/log/agent-app
+
+# ACL 적용: 핵심 관리 그룹(agent-core) 외 접근 불가 명시
+$ sudo setfacl -m g:agent-core:rwx $AGENT_HOME/api_keys
+$ sudo setfacl -m g:agent-core:rwx /var/log/agent-app
+$ sudo setfacl -d -m g:agent-core:rwx /var/log/agent-app
+
+$ getfacl $AGENT_HOME/upload_files
+getfacl: Removing leading '/' from absolute path names
+# file: home/agent-admin/agent-app/upload_files
+# owner: root
+# group: agent-common
+user::rwx
+group::rwx
+other::---
+
+$ getfacl $AGENT_HOME/api_keys
+getfacl: Removing leading '/' from absolute path names
+# file: home/agent-admin/agent-app/api_keys
+# owner: root
+# group: root
+user::rwx
+group::r-x
+group:agent-core:rwx
+mask::rwx
+other::r-x
+
+$getfacl /var/log/agent-app
+getfacl: Removing leading '/' from absolute path names
+# file: var/log/agent-app
+# owner: root
+# group: root
+user::rwx
+group::r-x
+group:agent-core:rwx
+mask::rwx
+other::r-x
+default:user::rwx
+default:group::r-x
+default:group:agent-core:rwx
+default:mask::rwx
+default:other::r-x
+```
+
 - 앱 Boot Sequence 5단계 [OK] 및 “Agent READY” 확인 내역
 - monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
 - /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
