@@ -285,6 +285,26 @@ default:other::r-x
 
 ### 앱 Boot Sequence 5단계 [OK] 및 “Agent READY” 확인 내역
 
+```
+# agent-admin 으로 계정으로 접속
+$ sudo su agent-admin
+
+# 1. ~/.bashrc 파일 끝에 환경 변수 블록 추가
+$ cat << 'EOF' >> ~/.bashrc
+
+export AGENT_HOME=/home/agent-admin/agent-app
+export AGENT_PORT=15034
+export AGENT_UPLOAD_DIR=$AGENT_HOME/upload_files
+export AGENT_KEY_PATH=$AGENT_HOME/api_keys/t_secret.key
+export AGENT_LOG_DIR=/var/log/agent-app
+EOF
+
+# 2. 수정된 내용을 현재 터미널에 즉시 반영
+$ source ~/.bashrc
+
+
+
+```
 
 - monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
 - /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
