@@ -303,7 +303,21 @@ EOF
 $ source ~/.bashrc
 
 
-
+$ python3 agent_app.py
+> Starting Agent Boot Sequence...
+[1/5] Checking User Account          [OK]
+... Running as service user 'agent-admin'
+[2/5] Verifying Environment Variables [OK]
+... All required Envs correct
+[3/5] Checking Required Files        [OK]
+... Verified key file with correct key string.
+[4/5] Checking Port Availability     [OK]
+... Port 15034 is available.
+[5/5] Verifying Log Permission       [OK]
+... Log directory is writable: /var/log/agent-app
+------------------------------------------------------------
+All Boot Checks Passed!
+Agent READY
 ```
 
 - monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
