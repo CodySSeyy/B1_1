@@ -5,6 +5,7 @@
 - 설정/명령어 기록 (SSH 포트, 방화벽 규칙, 계정/그룹/ACL, 디렉토리/권한, 환경 변수, cron 등록 등)
 
 ## 필수 증거 자료 체크리스트
+
 ### SSH 포트 변경(20022) 및 Root 원격 접속 차단 설정 확인 내역
 </br>
 
@@ -70,6 +71,7 @@ sudo systemctl restart ssh
 ```
 
 </br></br>
+---
 
 ###  방화벽(UFW 또는 firewalld) 활성화 및 20022/tcp, 15034/tcp만 허용 내역
 
@@ -108,8 +110,12 @@ To                         Action      From
 20022/tcp (v6)             ALLOW       Anywhere (v6)
 15034/tcp (v6)             ALLOW       Anywhere (v6)
 ```
+</br></br>
+---
 
 ### 계정/그룹(agent-admin/dev/test, agent-common/core) 생성 확인 내역
+
+</br>
 
 ```
 # 그룹 생성
@@ -138,6 +144,7 @@ agent-core:x:1002:agent-admin,agent-dev
    1. agent-admin: 그룹 이름
    2. x: 그룹 비밀번호 (보통 사용 안 함)
    3. 1001: 그룹 GID
+</br>
 
 ### 유저 생성 시 유저 이름과 같은 그룹이 생성되는 이유
 ```
@@ -147,15 +154,54 @@ agent-admin:x:1003:
 ```
 
 사용자를 생성할 때 해당 사용자 전용의 그룹을 자동으로 만들고, 이를 사용자의 기본 그룹(Primary Group)으로 설정
+</br>
 
 #### 이유
 만약 모든 사용자의 기본 그룹이 users나 common 같은 공통 그룹이라면 한 사용자가 파일을 만들 때 그룹 권한(rw-r-----)이 다른 사용자에게 노출될 위험이 큽니다. 
 
 전용 그룹을 사용하면 본인 외에는 그룹 권한으로도 파일에 접근할 수 없어 안전합니다.
 
+</br></br>
+---
+
 ### 디렉토리 구조 및 권한(ACL 포함) 확인 내역
+
 #### 접근 제어 목록(Access Control List)
-Access Control List (ACL)는 파일과 디렉토리에 대해 세분화된 사용자 및 그룹 권한을 설정할 수 있게 해주는 기능입니다. 기본적인 리눅스 권한 시스템은 소유자, 그룹, 기타에 대한 권한을 제공하는 반면, ACL을 통해서는 특정 사용자 또는 그룹에 대해 더 구체적인 권한을 부여할 수 있습니다.
+Access Control List (ACL)는 파일과 디렉토리에 대해 세분화된 사용자 및 그룹 권한을 설정할 수 있게 해주는 기능입니다. 
+</br>
+기본적인 리눅스 권한 시스템은 소유자, 그룹, 기타에 대한 권한을 제공하는 반면, ACL을 통해서는 특정 사용자 또는 그룹에 대해 더 구체적인 권한을 부여할 수 있습니다.
+
+#### 1.&nbsp; ACL이 필요한 이유 (기존 방식의 한계)
+
+기존 리눅스 방식은 파일 하나당 "주인 1명, 그룹 1개"만 지정할 수 있습니다. 
+
+   * 상황: project.txt라는 파일이 있습니다.
+       * 주인: 철수 (읽기/쓰기)
+       * 그룹: 개발팀 (읽기전용)
+       * 나머지: 아무 권한 없음
+
+   * 문제 발생: 갑자기 보안팀의 영희에게만 이 파일을 읽을 수 있게 해달라는 요청이 왔습니다.
+       * 기존 방식으로는? 
+           1. 영희를 개발팀에 넣는다? (영희가 개발팀의 다른 모든 파일까지 보게 됨 - 보안 위반)
+           2. 나머지(Others)에게 읽기 권한을 준다? (전 직원이 다 보게 됨 - 보안 위반)
+           3. 파일을 복사해서 준다? (데이터가 동기화 안 됨)
+
+  이때 ACL을 쓰면 "이 파일에 대해서만 영희(특정 유저)에게 읽기 권한을 추가해!"라고 딱 집어서 명령할 수 있습니다.
+
+#### 2.&nbsp; 주요 명령어
+
+* getfacl (get file acl): 파일에 설정된 ACL 상세 정보를 확인합니다.
+* setfacl (set file acl): 권한을 설정하거나 삭제합니다.
+
+    sudo setfacl -d -m g:agent-common:rwx $AGENT_HOME/upload_files
+    -  setfacl: "권한 목록(ACL)을 설정"
+    -  -d: "앞으로 이 폴더 안에 생길 모든 파일들에게도 똑같이 적용 (Default),"
+    -  -m: "기존 권한에 다음 내용을 수정/추가 (Modify)."
+    -  g:agent-common:rwx: "agent-common 그룹에게 읽기/쓰기/실행(rwx) 권한 부여"
+    -  $AGENT_HOME/upload_files: "대상 폴더"
+
+</br></br>
+
 ```
 # 1. 환경 변수 설정 (권장: /home/agent-admin/agent-app)
 $ export AGENT_HOME=/home/agent-admin/agent-app
@@ -186,7 +232,6 @@ $ sudo setfacl -m g:agent-core:rwx /var/log/agent-app
 $ sudo setfacl -d -m g:agent-core:rwx /var/log/agent-app
 
 $ getfacl $AGENT_HOME/upload_files
-getfacl: Removing leading '/' from absolute path names
 # file: home/agent-admin/agent-app/upload_files
 # owner: root
 # group: agent-common
@@ -195,7 +240,6 @@ group::rwx
 other::---
 
 $ getfacl $AGENT_HOME/api_keys
-getfacl: Removing leading '/' from absolute path names
 # file: home/agent-admin/agent-app/api_keys
 # owner: root
 # group: root
@@ -206,23 +250,42 @@ mask::rwx
 other::r-x
 
 $getfacl /var/log/agent-app
-getfacl: Removing leading '/' from absolute path names
 # file: var/log/agent-app
 # owner: root
 # group: root
 user::rwx
 group::r-x
 group:agent-core:rwx
-mask::rwx
+mask::rwxe
 other::r-x
 default:user::rwx
 default:group::r-x
-default:group:agent-core:rwx
+default:group:agent-core:rwx 
 default:mask::rwx
 default:other::r-x
 ```
+</br>
 
-- 앱 Boot Sequence 5단계 [OK] 및 “Agent READY” 확인 내역
+| 명령어 | 풀네임 | 변경 대상 (대상) | 주요 용도 |
+| :--- | :--- | :--- | :--- |
+| **chown** | change owner | 소유 사용자 (& 소유 그룹) | 파일의 '주인'을 바꿀 때 사용 |
+| **chgrp** | change group | 소유 그룹 | 파일을 관리하는 '그룹'만 바꿀 때 사용 |
+| **chmod** | change mode | 읽기/쓰기/실행 권한 | 주인이든 누구든 '할 수 있는 일'을 정할 때 사용 |
+
+</br>
+
+| 대상 | 파일 내용 읽기/쓰기 | 파일 설정(권한/그룹) 변경 | 파일 소유자 변경 (chown) |
+| :--- | :--- | :--- | :--- |
+| **소유 사용자** | 가능 (본인 설정에 따라) | 가능 | 불가능 (root만 가능) |
+| **소유 그룹** | 가능 (주인이 허락한 경우) | 불가능 | 불가능 |
+| **나머지(Other)** | 가능 (주인이 허락한 경우) | 불가능 | 불가능 |
+| **Root 계정** | **무조건 가능** | **무조건 가능** | **무조건 가능** |
+</br></br>
+---
+
+### 앱 Boot Sequence 5단계 [OK] 및 “Agent READY” 확인 내역
+
+
 - monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
 - /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
 - crontab 매분 실행 등록 및 자동 실행 확인(1분 후 로그 증가) 내역
