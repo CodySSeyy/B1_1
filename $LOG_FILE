@@ -1,0 +1,1 @@
+"[$NOW] PID:${PID:-N/A} CPU:$CPU_USAGE% MEM:$(printf "%.1f" $MEM_USAGE)% DISK:$DISK_USED%" 

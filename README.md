@@ -329,6 +329,85 @@ Agent READY
 ```
 
 ### monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
+#### monitor.sh
+```
+#!/bin/bash
+
+# 1. 경로 및 설정 정의
+# 로그 저장 디렉토리가 없을 경우를 대비해 mkdir -p 추가
+LOG_DIR="/var/log/agent-app"
+LOG_FILE="$LOG_DIR/monitor.log"
+mkdir -p "$LOG_DIR"
+
+APP_NAME="agent_app.py"
+PORT=15034
+
+# 현재 시간 (로그 포맷용)
+NOW=$(date "+%Y-%m-%d %H:%M:%S")
+
+echo "====== SYSTEM MONITOR RESULT ======"
+
+# 2. Health Check (실패 시 종료)
+# 프로세스 확인
+PID=$(pgrep -f $APP_NAME)
+if [ -z "$PID" ]; then
+    echo "Checking process '$APP_NAME'... [FAIL]"
+    exit 1
+else
+    echo "Checking process '$APP_NAME'... [OK] (PID: $PID)"
+fi
+
+# 포트 확인 (ss 명령어가 없을 경우를 대비해 netstat 병행 고려 가능)
+PORT_CHECK=$(ss -tulnp 2>/dev/null | grep ":$PORT " | grep "LISTEN")
+if [ -z "$PORT_CHECK" ]; then
+    echo "Checking port $PORT... [FAIL]"
+    exit 1
+else
+    echo "Checking port $PORT... [OK]"
+fi
+
+# 3. 상태 점검 (경고만 출력)
+# 도커 컨테이너 내부에서는 ufw가 inactive인 경우가 많으므로 에러 방지 처리
+if command -v ufw > /dev/null; then
+    UFW_STATUS=$(ufw status 2>/dev/null | grep "Status: active")
+    if [ -z "$UFW_STATUS" ]; then
+        echo "[WARNING] Firewall is inactive"
+    fi
+else
+    echo "[INFO] UFW is not installed (Standard for Docker)"
+fi
+
+# 4. 자원 수집 및 임계값 경고
+echo -e "\n[RESOURCE MONITORING]"
+
+# CPU 사용률 (100 - idle)
+CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
+echo "CPU Usage : $CPU_USAGE%"
+# bc 명령어가 없을 경우를 대비한 정수 비교 방식 또는 bc 설치 확인 필요
+if (( $(echo "$CPU_USAGE > 20" | bc -l) )); then
+    echo "[WARNING] CPU threshold exceeded ($CPU_USAGE% > 20%)"
+fi
+
+# 메모리 사용률
+MEM_USAGE=$(free | grep Mem | awk '{print $3/$2 * 100.0}')
+echo "MEM Usage : $(printf "%.1f" $MEM_USAGE)%"
+if (( $(echo "$MEM_USAGE > 10" | bc -l) )); then
+    echo "[WARNING] MEM threshold exceeded ($(printf "%.1f" $MEM_USAGE)% > 10%)"
+fi
+
+# 디스크 사용률 (Root /)
+DISK_USED=$(df / | grep / | awk '{print $5}' | sed 's/%//')
+echo "DISK Used : $DISK_USED%"
+if [ "$DISK_USED" -gt 80 ]; then
+    echo "[WARNING] DISK threshold exceeded ($DISK_USED% > 80%)"
+fi
+
+# 5. 로그 기록 (요구된 포맷)
+# [YYYY-MM-DD HH:MM:SS] PID:... CPU:..% MEM:..% DISK_USED:..%
+echo "[$NOW] PID:$PID CPU:$CPU_USAGE% MEM:$(printf "%.1f" $MEM_USAGE)% DISK_USED:$DISK_USED%" >> $LOG_FILE
+
+echo -e "\n[INFO] Log appended: $LOG_FILE"
+```
 ```
 # bin 폴더 생성
 $ mkdir $AGENT_HOME/bin
@@ -382,7 +461,19 @@ $ tail -f /var/log/agent-app/monitor.log
 ---
 
 ### crontab 매분 실행 등록 및 자동 실행 확인(1분 후 로그 증가) 내역
+```
+# 크론탭 편집기 열기
+$ crontab -e
 
+# 파일에 추가
+* * * * * /home/agent-admin/agent-app/bin/monitor.sh >> /home/agent-admin/agent-app/bin/monitor_cron.log 2>&1
+
+# 로그 누적 확인
+$ tail -f /var/log/agent-app/monitor.log
+
+# crontab 작동 확인
+$ ls -l /var/log/agent-app/monitor.log
+```
 
 
 ## 자동화 스크립트 소스코드
