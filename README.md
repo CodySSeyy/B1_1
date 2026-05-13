@@ -33,16 +33,10 @@
 $ sudo sed -i 's/#Port 22/Port 20022/' /etc/ssh/sshd_config
 $ sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
 
-# 2. SSH 서비스 재시작
-$ sudo systemctl restart ssh
+# 2. SSH 서비스 시작
+$ service ssh restart
 
-# 포트 변경 전
-$ ss -tulnp
-Netid      State       Recv-Q      Send-Q            Local Address:Port             Peer Address:Port      Process
-tcp        LISTEN      0           4096              127.0.0.53%lo:53                    0.0.0.0:*
-tcp        LISTEN      0           4096                 127.0.0.54:53                    0.0.0.0:*
-
-# 포트 변경 후
+# 포트 변경 확인
 $ ss -tulnp | grep 20022
 Netid      State       Recv-Q      Send-Q            Local Address:Port             Peer Address:Port      Process
 tcp   LISTEN 0      128           0.0.0.0:20022      0.0.0.0:*
@@ -100,6 +94,9 @@ $ sudo ufw allow 20022/tcp
 $ sudo ufw allow 15034/tcp
 Rules updated
 Rules updated (v6)
+
+# ufw 활성화
+$ sudo ufw enable
 
 # 방화벽 확인
 $ sudo ufw status
@@ -302,8 +299,9 @@ EOF
 # 2. 수정된 내용을 현재 터미널에 즉시 반영
 $ source ~/.bashrc
 
+# 3. 앱 실행
+$ ./agent-app
 
-$ python3 agent_app.py
 > Starting Agent Boot Sequence...
 [1/5] Checking User Account          [OK]
 ... Running as service user 'agent-admin'
@@ -318,6 +316,13 @@ $ python3 agent_app.py
 ------------------------------------------------------------
 All Boot Checks Passed!
 Agent READY
+2026-05-13 16:02:47,117 [INFO] [SafetyGuard] Process priority lowered (nice=10).
+2026-05-13 16:02:47,117 [INFO] Agent listening at port 15034
+2026-05-13 16:02:47,117 [INFO] === Agent Started. Beginning resource cycle. ===
+2026-05-13 16:02:47,118 [INFO] --- Step Info: Mode=UP, CPU Lv=1, Mem=0MB ---
+2026-05-13 16:02:47,143 [INFO] [Memory] Increasing... (+25 MB) Total: 25 MB
+2026-05-13 16:02:47,174 [INFO] [CPU] Level 1 workload completed. Duration: 0.03s
+...
 ```
 
 - monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
