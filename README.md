@@ -299,7 +299,10 @@ EOF
 # 2. 수정된 내용을 현재 터미널에 즉시 반영
 $ source ~/.bashrc
 
-# 3. 앱 실행
+# 3. 키 파일 생성 
+$ echo "agent_api_key_test" > $AGENT_KEY_PATH
+
+# 4. 앱 실행
 $ ./agent-app
 
 > Starting Agent Boot Sequence...
@@ -325,9 +328,62 @@ Agent READY
 ...
 ```
 
-- monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
-- /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
-- crontab 매분 실행 등록 및 자동 실행 확인(1분 후 로그 증가) 내역
+### monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
+```
+# bin 폴더 생성
+$ mkdir $AGENT_HOME/bin
+
+# 소유자 그룹 설정
+$ chown agent-dev:agent-core $AGENT_HOME/bin/monitor.sh
+
+# 권한 설정
+$ chmod 750 $AGENT_HOME/bin/monitor.sh
+
+# agent-app 백그라운드 실행
+$ nohup $AGENT_HOME/upload_files/agent-app > /dev/null 2>&1 &
+
+# monitor.sh 실행 결과
+$ ./monitor.sh
+
+====== SYSTEM MONITOR RESULT ======
+Checking process 'agent_app'... [FAIL]
+agent-admin@98b4e4eaa24a:~/agent-app/bin$ vi monitor.sh
+agent-admin@98b4e4eaa24a:~/agent-app/bin$ ./monitor.sh
+====== SYSTEM MONITOR RESULT ======
+Checking process 'agent-app'... [OK] (PID: 815
+816)
+Checking port 15034... [OK]
+[WARNING] Firewall is inactive
+
+[RESOURCE MONITORING]
+CPU Usage : 1.4%
+./monitor.sh: line 54: bc: command not found
+MEM Usage : 6.5%
+./monitor.sh: line 61: bc: command not found
+DISK Used : 1%
+
+[INFO] Log appended: /var/log/agent-app/monitor.log
+
+```
+</br></br>
+
+---
+
+### /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
+```
+# 누적 로그 확인
+$ tail -f /var/log/agent-app/monitor.log
+
+[2026-05-13 17:00:45] PID:815
+816 CPU:1.4% MEM:6.5% DISK_USED:1%
+```
+</br></br>
+
+---
+
+### crontab 매분 실행 등록 및 자동 실행 확인(1분 후 로그 증가) 내역
+
+
 
 ## 자동화 스크립트 소스코드
 - monitor.sh : 시스템 상태 수집 및 로깅 스크립트
